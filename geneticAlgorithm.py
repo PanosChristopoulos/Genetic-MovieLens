@@ -6,13 +6,14 @@ from sklearn import preprocessing
 from scipy.stats import pearsonr
 import random
 from loadMovies import *
-
+from crossover import *
+import matplotlib.pyplot as plt
 
 data_columns = ['user_id', 'movie_id', 'rating', 'timestamp']
 data = pd.read_csv("ml-100k/u.data", sep='\t', names=data_columns, encoding='UTF-8')
 
 
-
+moviesUserTable1=pd.pivot_table(data,values='rating',index='user_id',columns='movie_id')
 #Κεντράρισμα αξιολογήσεων με βάση τη μέση βαθμολογία του χρήστη
 meanRating = data.groupby(by="user_id",as_index=False)['rating'].mean()
 ratingCentered = pd.merge(data,meanRating,on='user_id')
@@ -36,10 +37,12 @@ ratingsPreprocessed = ratingCentered.assign(finalRating=ratingNormalized[0])
 moviesUserTable=pd.pivot_table(ratingsPreprocessed,values='finalRating',index='user_id',columns='movie_id')
 finalMoviesUserTable = moviesUserTable.fillna(moviesUserTable.mean(axis=0))
 
+#Δημιουργία one hot encoded πινάκων
+oneHotEncodedRatings = ratingsPreprocessed.assign(finalRating = 1)
+oneHotEncodedTable = pd.pivot_table(oneHotEncodedRatings,values='finalRating',index='user_id',columns='movie_id').fillna(0)
 
 
-
-#Δημιουργία ενός oneHot Encoded πίνακα βαθμολογιών
+#Δημιουργία ενός one hot πίνακα με βάρη, έτσι ώστε μία καταχωρημένη τιμή να έχει μεγαλύτερη πιθανότητα επιλογής από μία που δεν υπάρχει
 oneHotRatings = ratingsPreprocessed.assign(finalRating = 1.2)
 oneHotTable = pd.pivot_table(oneHotRatings,values='finalRating',index='user_id',columns='movie_id').fillna(0.8)
 
@@ -94,14 +97,12 @@ def initialPopulation(userID,num):
         selectedMovies.append(movieCounter)
     for y in range(len(selectedMovies)):
         initialPopulationGenes.append(initPop[y])
-    print(num,"roulette Numbers", "for", userID, "are:", rouletteNumbers)
-    print(num,"selected Movie IDs", "for", userID, "are:", selectedMovies)
     selectedMovieNames = []
     for x in selectedMovies:
         selectedMovieNames.append(movieNameById(x))
-    print("Selected Movie names:")
-    for elem in selectedMovieNames:
-        print(elem) 
+    #print("Selected Movie names:")
+    #for elem in selectedMovieNames:
+    #    print(elem) 
     return [selectedMovies,initialPopulationGenes]
 
 
@@ -113,24 +114,103 @@ def userPopulationBySelectedMovies(userID,selectedMovies):
         initialPopulationGenesNeighbor.append(initPop[y])
     return initialPopulationGenesNeighbor
 
+#Συνάρτηση Εύρεσης Καταλληλότερου Γονέα με βάση τα αρχικά χρωμοσώματα και το υπάρχον mating Pool
+def fitnessFunction(initialPopulationChromosomes,matingPool,userMean):
+    pearsonSimilarityList = []
+    fitnessSum = 0
+    fitnessAvg = 0
+    for x in range(len(matingPool)):
+        pearsonSimilarityList.append(pearsonr(initialPopulationChromosomes,matingPool[x])[0])
+    fittestParentChr = pearsonSimilarityList.index(max(pearsonSimilarityList)) 
+    for y in range(len(pearsonSimilarityList)):
+        fitnessSum = fitnessSum + pearsonSimilarityList[y]
+        fitnessAvg = (fitnessSum/len(pearsonSimilarityList) + userMean)/2
+    return [fittestParentChr,fitnessAvg]
 
-#Συνάρτηση για επεξεργασία βάση userID
-def userProcessing(userID):
+def elitism(initialPopulationChromosomes,matingPool,userMean):
+    return fitnessFunction(initialPopulationChromosomes,matingPool,userMean)
+
+
+#Γενετικός Αλγόριθμος με είσοδο το userID
+def geneticAlgorithm(userID):
+    #Αρχικοποίηση πληθυσμού του χρήστη και εύρεση 10 πιο κοντινών γειτόνων
     initPop = initialPopulationFull(userID)
     tenSimilar = pearsonbyuser(userID)
     print("User",userID,"'s most similar users are:",tenSimilar)
+
+    #Είσοδος του μεγέθους αρχικού πληθυσμού και επιλογή αρχικού πληθυσμού με τη μέθοδο ρουλέτας με βάση το κόστος
     size = int(input("Size of Initial Population: "))
     initialPopulationUser = initialPopulation(userID,size)
     selectedMoviesbyUser = initialPopulationUser[0]
     initialPopulationChromosomes = initialPopulationUser[1]
-    selectedMovieNames = []
-    for x in selectedMoviesbyUser:
-        selectedMovieNames.append(movieNameById(x))
-    print("User no:",userID,"selected movies are",selectedMovieNames)
-    print("User no:",userID,"initial population chromosomes are",initialPopulationChromosomes)
-    #for xy in range(len(tenSimilar)):
-        #print("user",tenSimilar[xy],"ratings",userPopulationBySelectedMovies(xy,selectedMoviesbyUser))
+    userSum = 0
+    for x in range(len(initialPopulationUser[1])):
+        userSum = userSum + initialPopulationUser[1][x]
+    userMean = userSum/len(initialPopulationUser[1])
+    #Εμφάνιση επιλεγμένων ταινιών και αρχικών χρωμοσωμάτων
+    if size<50:
+        try:
+            selectedMovieNames = []
+            for x in selectedMoviesbyUser:
+                selectedMovieNames.append(movieNameById(x))
+            print("User no:",userID,"selected movies as chromosomes names are",selectedMovieNames)
+        except:
+            print("Can't display movie names")
+    #print("User no:",userID,"initial population chromosomes are",initialPopulationChromosomes)
+    #Ορισμός Mating Pool
+    matingPool = []
+    for x in range(len(tenSimilar)):
+        matingPool.append(userPopulationBySelectedMovies(tenSimilar[x],selectedMoviesbyUser))
+    #print(matingPool)
 
-initialPopulation(61,20)
+    generationNum =  int(input("Number of Generations "))
+    #Εύρεση Καταλληλότερου συζυγούς γονεά για τον χρήστη userID
+    fittestParentGA = fitnessFunction(initialPopulationChromosomes,matingPool,userMean)
+    generationList = []
+    generationFittness = []
+    fitnessParentOverallList = []
+    for x in range(generationNum):
+        #Χρησιμοποιείται ελιτισμός, αφού με κάθε νέα γενιά, αντικαθίσταται το χρωμόσωμα με τον καλύτερο πιθανό γονέα από το mating pool
+        effectCoeff = random.randint(1, 100)
+        elitismCoeff = 0
+        crossoverCoeff = 40
+        fittestParentGA1 = fitnessFunction(initialPopulationChromosomes,matingPool,userMean)
+        crossover(initialPopulationChromosomes,matingPool[fittestParentGA1[0]])
+        generationList.append(x)
+        generationFittness.append(fittestParentGA1[1])
+        print("Generation: ",x+1,"Generation Fitness",fittestParentGA1[1])
+        fitnessParentOverallList.append(tenSimilar[fittestParentGA1[0]])
+    uniquefitnessParentOverallList = []  
+    for x in fitnessParentOverallList: 
+        if x not in uniquefitnessParentOverallList: 
+            uniquefitnessParentOverallList.append(x)
+    for x in range(len(uniquefitnessParentOverallList)):
+        findMoviesToPropose(userID,uniquefitnessParentOverallList[x])
+    #plt.plot(generationList,generationFittness)
+    #plt.show()
+
+geneticAlgorithm(70)
 
 
+"""
+
+    for x in range(len(uniquefitnessParentOverallList)):
+        a = oneHotEncodedTable.loc[userID].values
+        b = oneHotEncodedTable.loc[uniquefitnessParentOverallList[x]].values
+        fitParList = moviesUserTable1.loc[uniquefitnessParentOverallList[x]].tolist()
+        moviesNotRated = []
+        for x in range(len(a)):
+            if b[x] == 1 and a[x] == 0:
+                moviesNotRated.append(x)
+        moviesToPropose = []
+        for x in range(len(moviesNotRated)):
+            if fitParList[x] > 2:
+                moviesToPropose.append(x)
+        print(moviesToPropose)
+        for x in range(len(moviesToPropose)):
+            try:
+                printMovieAndRatingByUser(uniquefitnessParentOverallList[x],moviesToPropose[x]+1)
+            except:
+                print(" ")
+
+"""
