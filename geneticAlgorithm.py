@@ -172,45 +172,30 @@ def geneticAlgorithm(userID):
     for x in range(generationNum):
         #Χρησιμοποιείται ελιτισμός, αφού με κάθε νέα γενιά, αντικαθίσταται το χρωμόσωμα με τον καλύτερο πιθανό γονέα από το mating pool
         effectCoeff = random.randint(1, 100)
-        elitismCoeff = 0
-        crossoverCoeff = 40
-        fittestParentGA1 = fitnessFunction(initialPopulationChromosomes,matingPool,userMean)
-        crossover(initialPopulationChromosomes,matingPool[fittestParentGA1[0]])
+        elitismCoeff = 100
+        crossoverCoeff = 100
+        if elitismCoeff>=effectCoeff:
+            fittestParentGA = fitnessFunction(initialPopulationChromosomes,matingPool,userMean)
+            print("elitism")
+        if crossoverCoeff>=effectCoeff:
+            crossover(initialPopulationChromosomes,matingPool[fittestParentGA[0]])
         generationList.append(x)
-        generationFittness.append(fittestParentGA1[1])
-        print("Generation: ",x+1,"Generation Fitness",fittestParentGA1[1])
-        fitnessParentOverallList.append(tenSimilar[fittestParentGA1[0]])
+        generationFittness.append(fittestParentGA[1])
+        print("Generation: ",x+1,"Generation Fitness",fittestParentGA[1])
+        fitnessParentOverallList.append(tenSimilar[fittestParentGA[0]])
     uniquefitnessParentOverallList = []  
     for x in fitnessParentOverallList: 
         if x not in uniquefitnessParentOverallList: 
             uniquefitnessParentOverallList.append(x)
     for x in range(len(uniquefitnessParentOverallList)):
         findMoviesToPropose(userID,uniquefitnessParentOverallList[x])
-    #plt.plot(generationList,generationFittness)
-    #plt.show()
-
-geneticAlgorithm(70)
+    plt.plot(generationList,generationFittness)
+    plt.show()
 
 
-"""
 
-    for x in range(len(uniquefitnessParentOverallList)):
-        a = oneHotEncodedTable.loc[userID].values
-        b = oneHotEncodedTable.loc[uniquefitnessParentOverallList[x]].values
-        fitParList = moviesUserTable1.loc[uniquefitnessParentOverallList[x]].tolist()
-        moviesNotRated = []
-        for x in range(len(a)):
-            if b[x] == 1 and a[x] == 0:
-                moviesNotRated.append(x)
-        moviesToPropose = []
-        for x in range(len(moviesNotRated)):
-            if fitParList[x] > 2:
-                moviesToPropose.append(x)
-        print(moviesToPropose)
-        for x in range(len(moviesToPropose)):
-            try:
-                printMovieAndRatingByUser(uniquefitnessParentOverallList[x],moviesToPropose[x]+1)
-            except:
-                print(" ")
+def main():
+    inputUser = int(input("Please type the desired input user's ID: "))
+    geneticAlgorithm(inputUser)
 
-"""
+main()

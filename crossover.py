@@ -13,7 +13,7 @@ def crossover(chr1, chr2):
 
     #Τυχαίος αριθμός τίθεται ως crossover point
     randomCrossoverPoint = random.randint(0, len(chr1)) 
-    #print("Crossover point :", randomCrossoverPoint,"out of",len(chr1)," -> ",chr1[:randomCrossoverPoint], " + ", chr2[randomCrossoverPoint:]) 
+    print("Crossover point :", randomCrossoverPoint,"out of",len(chr1)," -> ",chr1[:randomCrossoverPoint], " + ", chr2[randomCrossoverPoint:]) 
   
 #Διασταύρωση γονιδίων
     for i in range(randomCrossoverPoint, len(chr2)):
